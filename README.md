@@ -52,13 +52,14 @@ Read our paper for more details.
 GITHUB_TOKEN: 'GitHub Token Here (required)'
 OPENAI_API_KEY: 'OpenAI API Key Here if using OpenAI Model (optional)'
 ANTHROPIC_API_KEY: 'Anthropic API Key Here if using Anthropic Model (optional)'
+COHERE_API_KEY: 'Cohere API Key Here if using Cohere Model (optional)'
 TOGETHER_API_KEY: 'Together API Key Here if using Together Model (optional)'
 AZURE_OPENAI_API_KEY: 'Azure OpenAI API Key Here if using Azure OpenAI Model (optional)'
 AZURE_OPENAI_ENDPOINT: 'Azure OpenAI Endpoint Here if using Azure OpenAI Model (optional)'
 AZURE_OPENAI_DEPLOYMENT: 'Azure OpenAI Deployment Here if using Azure OpenAI Model (optional)'
 AZURE_OPENAI_API_VERSION: 'Azure OpenAI API Version Here if using Azure OpenAI Model (optional)'
 ```
-See the following links for tutorials on obtaining [Anthropic](https://docs.anthropic.com/claude/reference/getting-started-with-the-api), [OpenAI](https://platform.openai.com/docs/quickstart/step-2-set-up-your-api-key), and [Github](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) tokens.
+See the following links for tutorials on obtaining [Anthropic](https://docs.anthropic.com/claude/reference/getting-started-with-the-api), [Cohere](https://dashboard.cohere.com/welcome/register), [OpenAI](https://platform.openai.com/docs/quickstart/step-2-set-up-your-api-key), and [Github](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) tokens.
 
 ## 💽 Usage <a name="usage"></a>
 There are two steps to the SWE-agent pipeline. First SWE-agent takes an input GitHub issue and returns a pull request that attempts to fix it. We call that step *inference*. The second step (currently, only available for issues in the SWE-bench benchmark) is to *evaluate* the pull request to verify that it has indeed fixed the issue. 
