@@ -48,7 +48,7 @@ class APIStats(Serializable):
             field.name: getattr(self, field.name) + getattr(other, field.name)
             for field in fields(self)
         })
-
+    
     def replace(self, other):
         if not isinstance(other, APIStats):
             raise TypeError("Can only replace APIStats with APIStats")
@@ -227,7 +227,8 @@ class OpenAIModel(BaseModel):
             self.api_model = cfg["AZURE_OPENAI_DEPLOYMENT"]
             self.client = AzureOpenAI(api_key=cfg["AZURE_OPENAI_API_KEY"], azure_endpoint=cfg["AZURE_OPENAI_ENDPOINT"], api_version=cfg.get("AZURE_OPENAI_API_VERSION", "2024-02-01"))
         else:
-            self.client = OpenAI(api_key=cfg["OPENAI_API_KEY"])
+            api_base_url: Optional[str] = cfg.get("OPENAI_API_BASE_URL", None)
+            self.client = OpenAI(api_key=cfg["OPENAI_API_KEY"], base_url=api_base_url)
 
     def history_to_messages(
         self, history: list[dict[str, str]], is_demonstration: bool = False
@@ -689,85 +690,6 @@ class ReplayModel(BaseModel):
         return action
 
 
-class CohereModel(BaseModel):
-    MODELS = {
-        "command-r": {
-            "max_context": 4_000,  # This is the max output context, but inputs are 128_000
-            "cost_per_input_token": 5e-7,
-            "cost_per_output_token": 1.5e-6,
-        },
-        "command-r-plus": {
-            "max_context": 4_000,  # This is the max output context, but inputs are 128_000
-            "cost_per_input_token": 3e-6,
-            "cost_per_output_token": 1.5e-5,
-        },
-        # Add more Cohere models here as needed
-    }
-
-    def __init__(self, args: ModelArguments, commands: list[Command]):
-        super().__init__(args, commands)
-        from cohere import Client
-        cfg = config.Config(os.path.join(os.getcwd(), "keys.cfg"))
-        self.client = Client(cfg["COHERE_API_KEY"],
-                             client_name="swe-agent")
-
-    def history_to_messages(
-            self, history: list[dict[str, str]], is_demonstration: bool = False
-    ) -> list[dict[str, str]]:
-        """
-        Create `messages` by filtering out all keys except for role/content per `history` turn
-        """
-        # Remove system messages if it is a demonstration
-        if is_demonstration:
-            history = [entry for entry in history if entry["role"] != "system"]
-
-        # Return history components with just role, content fields
-        chat_history = [
-            {"role": entry["role"], "message": entry["content"]} for entry in history[:-1]
-        ]
-
-        # Get the latest message
-        latest_message = history[-1]["content"] if history else ""
-
-        return chat_history, latest_message
-
-    @retry(
-        wait=wait_random_exponential(min=1, max=15),
-        reraise=True,
-        stop=stop_after_attempt(3),
-        retry=retry_if_not_exception_type((CostLimitExceededError, RuntimeError)),
-    )
-    def query(self, history: list[dict[str, str]]) -> str:
-        """
-        Query the Cohere API with the given `history` and return the response.
-        """
-
-        chat_history, latest_message = self.history_to_messages(history)
-        response = self.client.chat(
-            model=self.api_model,
-            message=latest_message,
-            chat_history=chat_history,
-            max_tokens=self.model_metadata["max_context"],
-            temperature=self.args.temperature,
-            p=self.args.top_p,
-        )
-
-        # Estimate and log cost of generation
-        characters_per_token_estimate = 2.
-        chat_history_text = ""
-        for message in chat_history:
-            chat_history_text += message["role"] + ": " + message["message"] + "\n"
-        chat_history_text += latest_message
-
-        input_tokens = len(latest_message) // characters_per_token_estimate
-        output_tokens = len(response.text) // characters_per_token_estimate
-
-        logger.warning("Cost calculations are a rough estimates")
-
-        self.update_stats(input_tokens, output_tokens)
-        return response.text
-
-
 def get_model(args: ModelArguments, commands: Optional[list[Command]] = None):
     """
     Returns correct model object given arguments and commands
@@ -781,14 +703,13 @@ def get_model(args: ModelArguments, commands: Optional[list[Command]] = None):
         return HumanThoughtModel(args, commands)
     if args.model_name == "replay":
         return ReplayModel(args, commands)
-    elif args.model_name.startswith("gpt") or args.model_name.startswith("ft:gpt") or args.model_name.startswith(
-            "azure:gpt"):
+    elif args.model_name.startswith("gpt") or args.model_name.startswith("ft:gpt") or args.model_name.startswith("azure:gpt"):
         return OpenAIModel(args, commands)
     elif args.model_name.startswith("claude"):
         return AnthropicModel(args, commands)
     elif args.model_name.startswith("ollama"):
         return OllamaModel(args, commands)
-    elif args.model_name.startswith("command"):
-        return CohereModel(args, commands)
+    elif args.model_name in TogetherModel.SHORTCUTS:
+        return TogetherModel(args, commands)
     else:
         raise ValueError(f"Invalid model name: {args.model_name}")
